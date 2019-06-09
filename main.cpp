@@ -40,14 +40,17 @@ class Grafo {
         this->custoEuleriano += valor;
     }
 
-    unsigned int dijkstra(unsigned int verticeOrigem, unsigned int verticeDestino) {
+    unsigned int dijkstra(unsigned int verticeOrigem, unsigned int verticeDestino, list<unsigned int> &rota) {
         unsigned int distancia[this->getOrdem()];
         bool visitados[this->getOrdem()];
+        unsigned int roteamento[this->getOrdem()];
 
         // Inicializa os valores
+        rota.clear();
         for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
             distancia[i] = INT64_MAX; // infinito para o CPP
             visitados[i] = false;
+            roteamento[i] = INT64_MAX;
         }
         // A distancia depende da origem, no entanto na origem é zero
         distancia[verticeOrigem] = 0;
@@ -61,7 +64,7 @@ class Grafo {
         list<pair<unsigned int, unsigned int> >::iterator i;
         while (!fila.empty()) {
             // Primeiro elemento da fila
-            pair<unsigned int, unsigned int> item = fila.front();            
+            pair<unsigned int, unsigned int> item = fila.front();
             // Vertice é o primeiro do par
             unsigned int vertice = item.first;
             // Remove da fila
@@ -81,14 +84,29 @@ class Grafo {
                     if (distancia[verticeAdjacente] > (distancia[vertice] + valorAdjacente)) {
                         distancia[verticeAdjacente] = distancia[vertice] + valorAdjacente;
                         fila.push_back(make_pair(verticeAdjacente, distancia[verticeAdjacente]));
+                        roteamento[verticeAdjacente] = vertice;
                     }
 
                 }
             }
         }
 
-        // retorna a distância mínima até o destino
-		return distancia[verticeDestino];
+        if (distancia[verticeDestino] < this->getOrdem()) {
+            unsigned int vertice = verticeDestino;
+            while (true) {
+                rota.push_back(vertice);
+                if (roteamento[vertice] <= this->getOrdem()) {
+                    vertice = roteamento[vertice];
+                } else {
+                    break;
+                }
+            }
+
+            // retorna a distância mínima até o destino
+            return distancia[verticeDestino];
+        } else {
+            return -1;
+        }
     }
 
     unsigned int obtemGrau(unsigned int vertice) {
@@ -111,15 +129,13 @@ class Grafo {
         return true;
     }
 
-    // TODO: Arrumar o printCiclo
-    bool fleury(unsigned int origem, bool printCiclo) {
+    bool fleury(unsigned int origem, list<unsigned int> &ciclo) {
         list<unsigned int> *temp = new list<unsigned int>[this->getOrdem()];
         list<pair<unsigned int, unsigned int> >::iterator j;
-        bool visitados[this->getOrdem()];
+        unsigned int tamanho = this->getTamanho();
         int custo = 0;
 
         for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
-            visitados[i] = false;
             for (j = this->adjacencia[i].begin(); j != this->adjacencia[i].end(); ++j) {
                 temp[i].push_back(j->first);
             }
@@ -134,18 +150,16 @@ class Grafo {
         while (!fila.empty()) {
             // Primeiro elemento da fila
             unsigned int vertice = fila.front();
-            cout << "Inicio " << vertice << endl;
-            visitados[vertice] = true;
+            tamanho--;
+            ciclo.push_back(vertice);
             fila.pop_front();
 
             // Percorre cada vertice
             if (temp[vertice].size() == 0) {
-                cout << "Fechou ciclo" << endl;
                 break;
             }
             unsigned int verticeAdjacente = temp[vertice].front();
 
-            cout << "Adjacente " << verticeAdjacente << endl;
             // remove aresta
             temp[vertice].remove(verticeAdjacente);
             temp[verticeAdjacente].remove(vertice);
@@ -153,23 +167,20 @@ class Grafo {
             fila.push_back(verticeAdjacente);
         }
 
-        // Se ao fim ainda tiverem vertices nao visitados significa q caiu num ciclo não Euleriano
-        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
-            if (!visitados[i]) {
-                cout << "Ciclo não foi Euleriano." << endl;
-                return false;
-            }
+        // Se ao fim nao passou por todas as arestas, nao é um ciclo Euleriano
+        if (tamanho > 0) {
+            return false;
         }
         return true;
     }
 
-    void fleury(bool printCiclo) {
+    void fleury(list<unsigned int> &ciclo) {
         // Faz vertice a vertice até encontrar um fluxo Euleriano
         for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
-            if(this->fleury(i, printCiclo)) {
+            ciclo.clear();
+            if(this->fleury(i, ciclo)) {
                 break;
             }
-            cout << endl << endl;
         }
     }
 
@@ -224,7 +235,77 @@ class Grafo {
     }
 
     void eulerizar() {
+        bool impares[this->getOrdem()] = {false};
+        bool usados[this->getOrdem()] = {false};
 
+        // Encontra os vertices com grau impar
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if (this->obtemGrau(i) % 2 != 0) {
+                impares[i] = true;
+            }
+        }
+        unsigned int **distancia = new unsigned int*[this->getOrdem()];
+        list<unsigned int> **rotas = new list<unsigned int>*[this->getOrdem()];
+        for(unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if (impares[i] == true) {
+                distancia[i] = new unsigned int[this->getOrdem()]{INT32_MAX};
+                rotas[i] = new list<unsigned int>[this->getOrdem()];
+            }
+        }
+        list<unsigned int> rota;
+        
+
+        // Calcula a distancia entre eles
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if (impares[i] == false) {
+                continue;
+            }
+            for (unsigned int j = 0, len = this->getOrdem(); j < len; j++) {
+                if (i == j || impares[j] == false) {
+                    continue;
+                }
+                distancia[i][j] = this->dijkstra(i, j, rota);
+                rotas[i][j] = rota;
+                /*{
+                    1: 21
+                    2: 12
+                    3: 43
+                    4: 34                    
+                }*/
+            }
+        }
+
+        // Determina as melhores ligações e cria os caminhos virtuais
+        vector<pair<unsigned int, unsigned int> > vp;  
+        for (unsigned int i = 0; i < this->getOrdem(); i++) {
+            if (usados[i] == true || !impares[i]) {
+                continue;
+            }
+            unsigned int *colunas = distancia[i];
+            vp.clear();
+            for (unsigned int j = 0; j < this->getOrdem(); j++) {
+                if (i == j || usados[j] == true || !impares[j]) {
+                    continue;
+                }
+                vp.push_back(make_pair(colunas[j], j));
+            }
+            sort(vp.begin(), vp.end());
+            unsigned int vertice = vp[0].second;
+            unsigned int valor = vp[0].first;
+            usados[i] = true;
+            usados[vertice] = true;
+
+            list<unsigned int> rotaVertice = rotas[i][vertice];
+            while (!rotaVertice.empty()) {
+                unsigned int origem = rotaVertice.front();
+                rotaVertice.pop_front();
+                unsigned int destino = rotaVertice.front();
+                rotaVertice.pop_front();
+                cout << "Caminho virtual de " << origem;
+                cout << " para " << destino << " com custo " << valor << " adicionado." << endl;
+                this->adicionarArestaValoradaNaoDirigida(origem, destino, valor);
+            }
+        }
     }
 
     unsigned int getOrdem() {
@@ -236,9 +317,14 @@ class Grafo {
     }
 
     void carteiroChines() {
+        list<unsigned int> ciclo;
         if (this->isEuleriano()) {
             cout << "Euleriano" << endl;
-            this->fleury(true);
+            this->fleury(ciclo);
+            while(!ciclo.empty()) {
+                cout << ciclo.front() << " - ";
+                ciclo.pop_front();
+            }
             cout << "Custo: " << this->getCustoEuleriano();
         } else {
             cout << "Não euleriano" << endl;
@@ -246,7 +332,11 @@ class Grafo {
             cout << "Realizando eularização" << endl;
             if (this->isEuleriano()) {
                 cout << "Euleriano" << endl;
-                this->fleury(true);
+                this->fleury(ciclo);
+                while(!ciclo.empty()) {
+                    cout << ciclo.front() << " - ";
+                    ciclo.pop_front();
+                }
                 cout << "Custo: " << this->getCustoEuleriano();
             } else {
                 cout << "Deu ruim";
@@ -257,6 +347,7 @@ class Grafo {
 
 int main() {
     /*Grafo g1;
+    list<unsigned int> rota;
     g1.setOrdem(6);
 
     g1.adicionarArestaValoradaNaoDirigida(0, 1, 1);
@@ -269,10 +360,12 @@ int main() {
     g1.adicionarArestaValoradaNaoDirigida(3, 5, 5);
     g1.adicionarArestaValoradaNaoDirigida(4, 5, 8);
 
-    unsigned int distancia = g1.dijkstra(0, 5);
-    cout << "Distancia: " << distancia; */
-
-
+    unsigned int distancia = g1.dijkstra(0, 5, rota);
+    cout << "Distancia: " << distancia << endl << "Rota: ";
+    while(!rota.empty()) {
+        cout << rota.front() << " - ";
+        rota.pop_front();
+    }*/
 
     Grafo g2;
     
@@ -292,13 +385,15 @@ int main() {
     g2.adicionarArestaValoradaNaoDirigida(5, 6, 8);
     */
 
-    /*g2.setOrdem(5);
+    g2.setOrdem(6);
     g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
     g2.adicionarArestaValoradaNaoDirigida(0, 4, 1);
     g2.adicionarArestaValoradaNaoDirigida(1, 2, 1);
     g2.adicionarArestaValoradaNaoDirigida(2, 3, 1);
     g2.adicionarArestaValoradaNaoDirigida(3, 4, 1);
-    g2.adicionarArestaValoradaNaoDirigida(4, 1, 1);*/
+    g2.adicionarArestaValoradaNaoDirigida(4, 1, 1);
+    g2.adicionarArestaValoradaNaoDirigida(2, 5, 1);
+    g2.adicionarArestaValoradaNaoDirigida(3, 5, 1);
 
     /*
     g2.setOrdem(3);
@@ -312,7 +407,7 @@ int main() {
         cout << "Conexo";
     }*/
 
-    g2.setOrdem(7);
+    /*g2.setOrdem(7);
     g2.adicionarArestaValoradaNaoDirigida(0, 3, 1);
     g2.adicionarArestaValoradaNaoDirigida(0, 4, 1);
     g2.adicionarArestaValoradaNaoDirigida(1, 4, 1);
@@ -321,7 +416,7 @@ int main() {
     g2.adicionarArestaValoradaNaoDirigida(2, 6, 1);
     g2.adicionarArestaValoradaNaoDirigida(3, 4, 1);
     g2.adicionarArestaValoradaNaoDirigida(4, 5, 1);
-    g2.adicionarArestaValoradaNaoDirigida(5, 6, 1);
+    g2.adicionarArestaValoradaNaoDirigida(5, 6, 1);*/
 
     g2.carteiroChines();
 
