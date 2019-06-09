@@ -13,17 +13,19 @@ using namespace std;
  * Marcelo Luis Jung
  **/
 
-class GrafoLista {
+class Grafo {
     protected:
     unsigned int ordem;
     unsigned int tamanho;
     list<pair<unsigned int, unsigned int>> *adjacencia;
     unsigned int *nivelV;
+    unsigned int custoEuleriano;
 
     public:
     void setOrdem(unsigned int ordem) {
         this->ordem = ordem;
         this->tamanho = 0;
+        this->custoEuleriano = 0;
         this->adjacencia = new list<pair<unsigned int, unsigned int>>[ordem];
     }
 
@@ -35,6 +37,7 @@ class GrafoLista {
         this->adjacencia[verticeOrigem].push_back(make_pair(verticeDestino, valor));
         this->adjacencia[verticeDestino].push_back(make_pair(verticeOrigem, valor));
         this->tamanho++;
+        this->custoEuleriano += valor;
     }
 
     unsigned int dijkstra(unsigned int verticeOrigem, unsigned int verticeDestino) {
@@ -89,7 +92,139 @@ class GrafoLista {
     }
 
     unsigned int obtemGrau(unsigned int vertice) {
-        return this->adjacencia[vertice-1].size();
+        return this->adjacencia[vertice].size();
+    }
+
+    unsigned int getCustoEuleriano() {
+        return this->custoEuleriano;
+    }
+
+    bool isEuleriano() {
+        if (this->isDesconexo()) {
+            return false;
+        }
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if (this->obtemGrau(i) % 2 != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // TODO: Arrumar o printCiclo
+    bool fleury(unsigned int origem, bool printCiclo) {
+        list<unsigned int> *temp = new list<unsigned int>[this->getOrdem()];
+        list<pair<unsigned int, unsigned int> >::iterator j;
+        bool visitados[this->getOrdem()];
+        int custo = 0;
+
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            visitados[i] = false;
+            for (j = this->adjacencia[i].begin(); j != this->adjacencia[i].end(); ++j) {
+                temp[i].push_back(j->first);
+            }
+        }
+
+        // Criaremos uma fila para controlar o percorrimento... O par sera: quem é...sua distancia
+        list<unsigned int> fila;
+
+        // Inicio da busca
+        fila.push_back(origem);
+
+        while (!fila.empty()) {
+            // Primeiro elemento da fila
+            unsigned int vertice = fila.front();
+            cout << "Inicio " << vertice << endl;
+            visitados[vertice] = true;
+            fila.pop_front();
+
+            // Percorre cada vertice
+            if (temp[vertice].size() == 0) {
+                cout << "Fechou ciclo" << endl;
+                break;
+            }
+            unsigned int verticeAdjacente = temp[vertice].front();
+
+            cout << "Adjacente " << verticeAdjacente << endl;
+            // remove aresta
+            temp[vertice].remove(verticeAdjacente);
+            temp[verticeAdjacente].remove(vertice);
+
+            fila.push_back(verticeAdjacente);
+        }
+
+        // Se ao fim ainda tiverem vertices nao visitados significa q caiu num ciclo não Euleriano
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if (!visitados[i]) {
+                cout << "Ciclo não foi Euleriano." << endl;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void fleury(bool printCiclo) {
+        // Faz vertice a vertice até encontrar um fluxo Euleriano
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if(this->fleury(i, printCiclo)) {
+                break;
+            }
+            cout << endl << endl;
+        }
+    }
+
+    bool isDesconexo() {
+        // Aplicação do algoritmo de goodman
+        list<unsigned int> *temp = new list<unsigned int>[this->getOrdem()];
+        list<pair<unsigned int, unsigned int> >::iterator j;
+
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            for (j = this->adjacencia[i].begin(); j != this->adjacencia[i].end(); ++j) {
+                temp[i].push_back(j->first);
+            }
+        }
+
+        // Criaremos uma fila para controlar o percorrimento... O par sera: quem é...sua distancia
+        list<unsigned int> fila;
+        // Inicio da busca
+        fila.push_back(0); //TODO:CRIAR FUNCAO PEGA PRIMEIRO,ZERO É INSEGURO
+
+        bool removidos[this->getOrdem()] = {false};
+        
+        list<unsigned int>::iterator k;
+
+        while (!fila.empty()) {
+            // Primeiro elemento da fila
+            unsigned int vertice = fila.front();
+            fila.pop_front();
+
+            // Percorre cada vertice
+            unsigned int verticeAdjacente = 0;
+            for (k = temp[vertice].begin(); k != temp[vertice].end(); ++k) {
+                if (removidos[*k] || *k == vertice) {
+                    continue;
+                }
+                if (verticeAdjacente == 0) {
+                    verticeAdjacente = *k;
+                    fila.push_back(verticeAdjacente);
+                    continue; // Não cria a ele mesmo
+                }
+                temp[verticeAdjacente].push_back(*k);
+            }
+            removidos[vertice] = true;
+        }
+
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            if (!removidos[i]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void eulerizar() {
+
     }
 
     unsigned int getOrdem() {
@@ -99,56 +234,30 @@ class GrafoLista {
     unsigned int getTamanho() {
         return tamanho;
     }
+
+    void carteiroChines() {
+        if (this->isEuleriano()) {
+            cout << "Euleriano" << endl;
+            this->fleury(true);
+            cout << "Custo: " << this->getCustoEuleriano();
+        } else {
+            cout << "Não euleriano" << endl;
+            this->eulerizar();
+            cout << "Realizando eularização" << endl;
+            if (this->isEuleriano()) {
+                cout << "Euleriano" << endl;
+                this->fleury(true);
+                cout << "Custo: " << this->getCustoEuleriano();
+            } else {
+                cout << "Deu ruim";
+            }
+        }
+    }
 };
 
-void importarArquivoLista(string arquivo, GrafoLista &grafo) {
-    string linha;
-    unsigned int nLinha = 0;
-    ifstream arquivoEntrada;
-
-    arquivoEntrada.open(arquivo);
-    if (arquivoEntrada.is_open()) {
-        while (getline(arquivoEntrada, linha)) {
-            unsigned int pos = linha.find(" ");
-            if (nLinha == 0) {
-                grafo.setOrdem(std::stoul(linha.substr(0, pos)));
-                nLinha++; 
-                continue;
-            }
-            //grafo.adicionarArestaNaoDirigida(std::stoul(linha.substr(0, pos)), std::stoul(linha.substr(pos+1, sizeof(linha)+1)), true);
-        }
-        arquivoEntrada.close();
-    }
-}
-
-void exportarArquivoLista(string arquivo, GrafoLista &grafo) {
-    ofstream arquivoSaida;
-    arquivoSaida.open(arquivo);
-    if (arquivoSaida.is_open()) {
-        arquivoSaida << grafo.getOrdem() << endl;
-        arquivoSaida << grafo.getTamanho() << endl;
-        arquivoSaida.close();
-    }
-}
-
 int main() {
-    GrafoLista g1;
+    /*Grafo g1;
     g1.setOrdem(6);
-
-
-    /*
-    4 9
-    0 1 1
-    0 3 4
-    0 4 2
-    1 2 5
-    1 5 3
-    2 5 5
-    3 4 2
-    3 5 5
-    4 5 8
-    
-    */
 
     g1.adicionarArestaValoradaNaoDirigida(0, 1, 1);
     g1.adicionarArestaValoradaNaoDirigida(0, 3, 4);
@@ -160,9 +269,61 @@ int main() {
     g1.adicionarArestaValoradaNaoDirigida(3, 5, 5);
     g1.adicionarArestaValoradaNaoDirigida(4, 5, 8);
 
-
     unsigned int distancia = g1.dijkstra(0, 5);
-    cout << "Distancia: " << distancia;
+    cout << "Distancia: " << distancia; */
+
+
+
+    Grafo g2;
+    
+    /*
+    g2.setOrdem(7);
+    g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
+    g2.adicionarArestaValoradaNaoDirigida(0, 4, 2);
+    g2.adicionarArestaValoradaNaoDirigida(1, 2, 2);
+    g2.adicionarArestaValoradaNaoDirigida(1, 3, 5);
+    g2.adicionarArestaValoradaNaoDirigida(1, 4, 3);
+    g2.adicionarArestaValoradaNaoDirigida(2, 6, 5);
+    g2.adicionarArestaValoradaNaoDirigida(2, 5, 2);
+    g2.adicionarArestaValoradaNaoDirigida(2, 3, 5);
+    g2.adicionarArestaValoradaNaoDirigida(3, 4, 8);
+    g2.adicionarArestaValoradaNaoDirigida(3, 5, 8);
+    g2.adicionarArestaValoradaNaoDirigida(4, 5, 8);
+    g2.adicionarArestaValoradaNaoDirigida(5, 6, 8);
+    */
+
+    /*g2.setOrdem(5);
+    g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
+    g2.adicionarArestaValoradaNaoDirigida(0, 4, 1);
+    g2.adicionarArestaValoradaNaoDirigida(1, 2, 1);
+    g2.adicionarArestaValoradaNaoDirigida(2, 3, 1);
+    g2.adicionarArestaValoradaNaoDirigida(3, 4, 1);
+    g2.adicionarArestaValoradaNaoDirigida(4, 1, 1);*/
+
+    /*
+    g2.setOrdem(3);
+    g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
+    g2.adicionarArestaValoradaNaoDirigida(1, 2, 1);
+    g2.adicionarArestaValoradaNaoDirigida(2, 0, 1);
+
+    if (g2.isDesconexo()) {
+        cout << "Desconexo";
+    } else {
+        cout << "Conexo";
+    }*/
+
+    g2.setOrdem(7);
+    g2.adicionarArestaValoradaNaoDirigida(0, 3, 1);
+    g2.adicionarArestaValoradaNaoDirigida(0, 4, 1);
+    g2.adicionarArestaValoradaNaoDirigida(1, 4, 1);
+    g2.adicionarArestaValoradaNaoDirigida(1, 5, 1);
+    g2.adicionarArestaValoradaNaoDirigida(2, 5, 1);
+    g2.adicionarArestaValoradaNaoDirigida(2, 6, 1);
+    g2.adicionarArestaValoradaNaoDirigida(3, 4, 1);
+    g2.adicionarArestaValoradaNaoDirigida(4, 5, 1);
+    g2.adicionarArestaValoradaNaoDirigida(5, 6, 1);
+
+    g2.carteiroChines();
 
     return 0;
 }
