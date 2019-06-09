@@ -13,67 +13,79 @@ using namespace std;
  * Marcelo Luis Jung
  **/
 
-class Grafo {
-    public:
-    void adicionarArestaNaoDirigida(unsigned int verticeOrigem, unsigned int verticeDestino, bool somarTamanho);
-    unsigned int obtemGrau(unsigned int vertice);
-    void setOrdem(unsigned int ordem);
-    void printSeqGrau(ofstream &arquivoSaida);
-    unsigned int getOrdem();
-    unsigned int getTamanho();
-    void realizarBuscaProfundidade(unsigned int verticeOrigem, bool exportar, string arquivo);
-    bool realizarBuscaLargura(unsigned int verticeOrigem, bool exportar, string arquivo);
-    unsigned int getNivelV(unsigned int vertice);
-};
-
-class GrafoLista : public Grafo {
+class GrafoLista {
     protected:
     unsigned int ordem;
     unsigned int tamanho;
-    list<unsigned int> *adjacencia;
+    list<pair<unsigned int, unsigned int>> *adjacencia;
     unsigned int *nivelV;
 
-    // método que utiliza a recursão para percorrer toda a lista de adjacencia do vértice em questão
-    void realizarVisitaVertice(unsigned int vertice, bool visitados[], unsigned int pai[], int nivel, unsigned int nivelV[]) {
-        // oficialmente ele foi visitado
-        visitados[vertice] = true;
-        //cout << "Vertice " << (vertice+1) << " foi visitado." << endl;
-
-        // vamos visitar todas as adjacencias do vertice agora....
-        list<unsigned int>::iterator i;
-        nivel++;
-        for (i = this->adjacencia[vertice].begin(); i != this->adjacencia[vertice].end(); ++i) {
-            // a adjacencia ainda não foi visitada?
-            if (!visitados[*i]) {
-                // pois agora será...
-                pai[*i] = vertice;
-                nivelV[*i] = nivel;
-                realizarVisitaVertice(*i, visitados, pai, nivel, nivelV);
-            }
-        }
-    }
-
     public:
-    ~GrafoLista() {
-        delete this->adjacencia;
-    }
-
     void setOrdem(unsigned int ordem) {
         this->ordem = ordem;
         this->tamanho = 0;
-        this->adjacencia = new list<unsigned int>[ordem];
+        this->adjacencia = new list<pair<unsigned int, unsigned int>>[ordem];
     }
 
     void setTamanho(unsigned int tamanho) {
         this->tamanho = tamanho;
     }
 
-    void adicionarArestaNaoDirigida(unsigned int verticeOrigem, unsigned int verticeDestino, bool somarTamanho) {
-        this->adjacencia[verticeOrigem-1].push_back(verticeDestino-1);
-        this->adjacencia[verticeDestino-1].push_back(verticeOrigem-1);
-        if (somarTamanho) {
-            this->tamanho++;
+    void adicionarArestaValoradaNaoDirigida(unsigned int verticeOrigem, unsigned int verticeDestino, unsigned int valor) {
+        this->adjacencia[verticeOrigem].push_back(make_pair(verticeDestino, valor));
+        this->adjacencia[verticeDestino].push_back(make_pair(verticeOrigem, valor));
+        this->tamanho++;
+    }
+
+    unsigned int dijkstra(unsigned int verticeOrigem, unsigned int verticeDestino) {
+        unsigned int distancia[this->getOrdem()];
+        bool visitados[this->getOrdem()];
+
+        // Inicializa os valores
+        for (unsigned int i = 0, len = this->getOrdem(); i < len; i++) {
+            distancia[i] = INT64_MAX; // infinito para o CPP
+            visitados[i] = false;
         }
+        // A distancia depende da origem, no entanto na origem é zero
+        distancia[verticeOrigem] = 0;
+
+        // Criaremos uma fila para controlar o percorrimento... O par sera: quem é...sua distancia
+        list<pair<unsigned int, unsigned int>> fila;
+        
+        // Inicio da busca ocorre na origem
+        fila.push_back(make_pair(verticeOrigem, distancia[verticeOrigem]));
+        
+        list<pair<unsigned int, unsigned int> >::iterator i;
+        while (!fila.empty()) {
+            // Primeiro elemento da fila
+            pair<unsigned int, unsigned int> item = fila.front();            
+            // Vertice é o primeiro do par
+            unsigned int vertice = item.first;
+            // Remove da fila
+            fila.pop_front();
+
+            // Se não foi visitado, então...
+            if (!visitados[vertice]) {
+                // Agora foi!
+                visitados[vertice] = true;
+
+                // Realiza o percorrimento dos adjacentes
+                for (i = this->adjacencia[vertice].begin(); i != this->adjacencia[vertice].end(); i++) {
+                    unsigned int verticeAdjacente = i->first;
+                    unsigned int valorAdjacente = i->second;
+
+                    // Hora do relaxamento 4i20
+                    if (distancia[verticeAdjacente] > (distancia[vertice] + valorAdjacente)) {
+                        distancia[verticeAdjacente] = distancia[vertice] + valorAdjacente;
+                        fila.push_back(make_pair(verticeAdjacente, distancia[verticeAdjacente]));
+                    }
+
+                }
+            }
+        }
+
+        // retorna a distância mínima até o destino
+		return distancia[verticeDestino];
     }
 
     unsigned int obtemGrau(unsigned int vertice) {
@@ -87,120 +99,6 @@ class GrafoLista : public Grafo {
     unsigned int getTamanho() {
         return tamanho;
     }
-
-    void printSeqGrau(ofstream &arquivoSaida) {
-        arquivoSaida << "(";
-        vector<unsigned int> graus;
-        
-        for (unsigned int i = 1; i <= ordem; i++) {
-            graus.push_back(this->obtemGrau(i));
-        }
-        std::sort(graus.begin(), graus.end());
-        for (unsigned int i = 0, len = graus.size(); i < len; i++) {
-            arquivoSaida << graus[i];
-            if ((i+1) < len) arquivoSaida << ",";
-        }
-        arquivoSaida << ")";
-    }
-
-    void realizarBuscaProfundidade(unsigned int verticeOrigem, bool exportar, string arquivo) {
-        //cout << "BFS ... Origem: " << verticeOrigem << endl;
-        
-        // inicialmente nenhum vértice foi visitado
-        bool *visitados = new bool[ordem]{false};
-        unsigned int *pai = new unsigned int[ordem]{0};
-        unsigned int nivel = 0;
-        this->nivelV = new unsigned int[ordem]{0};
-
-        // iremos buscar à partir de um vertice origem
-        this->realizarVisitaVertice((verticeOrigem-1), visitados, pai, nivel, this->nivelV);
-        
-        if (exportar) {
-            ofstream arquivoSaida;
-            arquivoSaida.open(arquivo);
-            if (arquivoSaida.is_open()) {
-                for (unsigned int i = 0; i < ordem; i++) {
-                    arquivoSaida << "[V] " << (i+1) << " [P] ";
-                    if (this->nivelV[i] == 0) {
-                        arquivoSaida << "n";
-                    } else {
-                        arquivoSaida << (pai[i]+1);
-                    }
-                    arquivoSaida << " [L] " << this->nivelV[i] << endl;
-                }
-                arquivoSaida.close();
-            }
-        }
-    }
-
-    bool realizarBuscaLargura(unsigned int verticeOrigem, bool exportar, string arquivo) {
-        //cout << "BFS ... Origem: " << verticeOrigem << endl;
-
-        // inicialmente nenhum vértice foi visitado
-        bool *visitados = new bool[ordem]{false};
-        unsigned int *pai = new unsigned int[ordem]{0};
-        unsigned int nivel = 0;
-        this->nivelV = new unsigned int[ordem]{0};
-
-        // o algoritmo se baseia na fila
-        list<unsigned int> fila;
-
-        // oficialmente ele foi visitado
-        visitados[(verticeOrigem-1)] = true;
-        // empilha o vertice visitado no final
-        fila.push_back((verticeOrigem-1));
-
-        list<unsigned int>::iterator i;
-        while (!fila.empty()) {
-            // vertice à ser explorado
-            unsigned int vertice = fila.front();
-            //cout << "Vertice " << (vertice+1) << " foi visitado." << endl;
-            // desempilha o vertice que está sendo explorado
-            fila.pop_front();
-            nivel++;
-
-            // vamos visitar todas as adjacencias do vertice agora....
-            for (i = this->adjacencia[vertice].begin(); i != this->adjacencia[vertice].end(); ++i) {
-                // a adjacencia ainda não foi visitada?
-                if (!visitados[*i]) {
-                    pai[*i] = vertice;
-                    this->nivelV[*i] = nivel;
-                    // pois agora será...
-                    visitados[*i] = true;
-                    // empilha ela para percorrer também
-                    fila.push_back(*i);
-                }
-            }
-        }
-
-        if (exportar) {
-            ofstream arquivoSaida;
-            arquivoSaida.open(arquivo);
-            if (arquivoSaida.is_open()) {
-                for (unsigned int i = 0; i < ordem; i++) {
-                    arquivoSaida << "[V] " << (i+1) << " [P] ";
-                    if (this->nivelV[i] == 0) {
-                        arquivoSaida << "n";
-                    } else {
-                        arquivoSaida << (pai[i]+1);
-                    }
-                    arquivoSaida << " [L] " << this->nivelV[i] << endl;
-                }
-                arquivoSaida.close();
-            }
-        }
-
-        for (int i = 0; i < ordem; i++) {
-            if (!visitados[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    unsigned int getNivelV(unsigned int vertice) {
-        return this->nivelV[vertice];
-    }
 };
 
 void importarArquivoLista(string arquivo, GrafoLista &grafo) {
@@ -211,13 +109,13 @@ void importarArquivoLista(string arquivo, GrafoLista &grafo) {
     arquivoEntrada.open(arquivo);
     if (arquivoEntrada.is_open()) {
         while (getline(arquivoEntrada, linha)) {
+            unsigned int pos = linha.find(" ");
             if (nLinha == 0) {
-                grafo.setOrdem(std::stoull(linha));
+                grafo.setOrdem(std::stoul(linha.substr(0, pos)));
                 nLinha++; 
                 continue;
             }
-            unsigned int pos = linha.find(" ");
-            grafo.adicionarArestaNaoDirigida(std::stoul(linha.substr(0, pos)), std::stoul(linha.substr(pos+1, sizeof(linha)+1)), true);
+            //grafo.adicionarArestaNaoDirigida(std::stoul(linha.substr(0, pos)), std::stoul(linha.substr(pos+1, sizeof(linha)+1)), true);
         }
         arquivoEntrada.close();
     }
@@ -229,14 +127,42 @@ void exportarArquivoLista(string arquivo, GrafoLista &grafo) {
     if (arquivoSaida.is_open()) {
         arquivoSaida << grafo.getOrdem() << endl;
         arquivoSaida << grafo.getTamanho() << endl;
-        grafo.printSeqGrau(arquivoSaida);
         arquivoSaida.close();
     }
 }
 
 int main() {
     GrafoLista g1;
-    importarArquivoLista("grafo5.txt", g1);
+    g1.setOrdem(6);
+
+
+    /*
+    4 9
+    0 1 1
+    0 3 4
+    0 4 2
+    1 2 5
+    1 5 3
+    2 5 5
+    3 4 2
+    3 5 5
+    4 5 8
+    
+    */
+
+    g1.adicionarArestaValoradaNaoDirigida(0, 1, 1);
+    g1.adicionarArestaValoradaNaoDirigida(0, 3, 4);
+    g1.adicionarArestaValoradaNaoDirigida(0, 4, 2);
+    g1.adicionarArestaValoradaNaoDirigida(1, 2, 5);
+    g1.adicionarArestaValoradaNaoDirigida(1, 5, 3);
+    g1.adicionarArestaValoradaNaoDirigida(2, 5, 5);
+    g1.adicionarArestaValoradaNaoDirigida(3, 4, 2);
+    g1.adicionarArestaValoradaNaoDirigida(3, 5, 5);
+    g1.adicionarArestaValoradaNaoDirigida(4, 5, 8);
+
+
+    unsigned int distancia = g1.dijkstra(0, 5);
+    cout << "Distancia: " << distancia;
 
     return 0;
 }
