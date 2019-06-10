@@ -161,8 +161,30 @@ class Grafo {
             unsigned int verticeAdjacente = temp[vertice].front();
 
             // remove aresta
-            temp[vertice].remove(verticeAdjacente);
-            temp[verticeAdjacente].remove(vertice);
+            list<unsigned int> ligacao = temp[vertice];
+            list<unsigned int>::iterator t;
+            for (t = ligacao.begin(); t != ligacao.end(); ++t) {
+                if (*t == verticeAdjacente) {
+                    ligacao.pop_front();
+                    break;
+                }
+            }
+            temp[vertice] = ligacao;
+
+            //temp[vertice].remove(verticeAdjacente);
+
+            list<unsigned int>::iterator k;
+            ligacao.clear();
+            ligacao = temp[verticeAdjacente];
+            for (k = ligacao.begin(); k != ligacao.end(); ++k) {
+                if (*k == vertice) {
+                    ligacao.pop_front();
+                    break;
+                }
+            }
+            temp[verticeAdjacente] = ligacao;
+
+            //temp[verticeAdjacente].remove(vertice);
 
             fila.push_back(verticeAdjacente);
         }
@@ -297,10 +319,12 @@ class Grafo {
 
             list<unsigned int> rotaVertice = rotas[i][vertice];
             while (!rotaVertice.empty()) {
+                if (rotaVertice.size() == 1) {
+                    break;
+                }
                 unsigned int origem = rotaVertice.front();
                 rotaVertice.pop_front();
                 unsigned int destino = rotaVertice.front();
-                rotaVertice.pop_front();
                 cout << "Caminho virtual de " << origem;
                 cout << " para " << destino << " com custo " << valor << " adicionado." << endl;
                 this->adicionarArestaValoradaNaoDirigida(origem, destino, valor);
@@ -345,80 +369,61 @@ class Grafo {
     }
 };
 
+void importarArquivoLista(string arquivo, Grafo &grafo, int questao) {
+    string linha;
+    unsigned int nLinha = 0;
+    ifstream arquivoEntrada;
+
+    arquivoEntrada.open(arquivo);
+    if (arquivoEntrada.is_open()) {
+        while (getline(arquivoEntrada, linha)) {
+            unsigned int pos = linha.find(" ");
+            if (nLinha == 0) {
+                if (questao == 1) {
+                    grafo.setOrdem(std::stoul(linha.substr(0, pos))+2);
+                } else {
+                    grafo.setOrdem(std::stoul(linha.substr(0, pos)));
+                }
+                nLinha++; 
+                continue;
+            }
+            string linha2 = linha.substr(pos+1, sizeof(linha)+1);
+            unsigned int pos2 = linha2.find(" ");
+            grafo.adicionarArestaValoradaNaoDirigida(std::stoul(linha.substr(0, pos)), std::stoul(linha2.substr(0, pos2)), std::stoul(linha2.substr(pos2+1, sizeof(linha2)+1)));
+        }
+        arquivoEntrada.close();
+    }
+}
+
 int main() {
-    /*Grafo g1;
-    list<unsigned int> rota;
-    g1.setOrdem(6);
+    int i;
+    string arquivo;
+    Grafo grafo;
 
-    g1.adicionarArestaValoradaNaoDirigida(0, 1, 1);
-    g1.adicionarArestaValoradaNaoDirigida(0, 3, 4);
-    g1.adicionarArestaValoradaNaoDirigida(0, 4, 2);
-    g1.adicionarArestaValoradaNaoDirigida(1, 2, 5);
-    g1.adicionarArestaValoradaNaoDirigida(1, 5, 3);
-    g1.adicionarArestaValoradaNaoDirigida(2, 5, 5);
-    g1.adicionarArestaValoradaNaoDirigida(3, 4, 2);
-    g1.adicionarArestaValoradaNaoDirigida(3, 5, 5);
-    g1.adicionarArestaValoradaNaoDirigida(4, 5, 8);
-
-    unsigned int distancia = g1.dijkstra(0, 5, rota);
-    cout << "Distancia: " << distancia << endl << "Rota: ";
-    while(!rota.empty()) {
-        cout << rota.front() << " - ";
-        rota.pop_front();
-    }*/
-
-    Grafo g2;
-    
-    /*
-    g2.setOrdem(7);
-    g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
-    g2.adicionarArestaValoradaNaoDirigida(0, 4, 2);
-    g2.adicionarArestaValoradaNaoDirigida(1, 2, 2);
-    g2.adicionarArestaValoradaNaoDirigida(1, 3, 5);
-    g2.adicionarArestaValoradaNaoDirigida(1, 4, 3);
-    g2.adicionarArestaValoradaNaoDirigida(2, 6, 5);
-    g2.adicionarArestaValoradaNaoDirigida(2, 5, 2);
-    g2.adicionarArestaValoradaNaoDirigida(2, 3, 5);
-    g2.adicionarArestaValoradaNaoDirigida(3, 4, 8);
-    g2.adicionarArestaValoradaNaoDirigida(3, 5, 8);
-    g2.adicionarArestaValoradaNaoDirigida(4, 5, 8);
-    g2.adicionarArestaValoradaNaoDirigida(5, 6, 8);
-    */
-
-    g2.setOrdem(6);
-    g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
-    g2.adicionarArestaValoradaNaoDirigida(0, 4, 1);
-    g2.adicionarArestaValoradaNaoDirigida(1, 2, 1);
-    g2.adicionarArestaValoradaNaoDirigida(2, 3, 1);
-    g2.adicionarArestaValoradaNaoDirigida(3, 4, 1);
-    g2.adicionarArestaValoradaNaoDirigida(4, 1, 1);
-    g2.adicionarArestaValoradaNaoDirigida(2, 5, 1);
-    g2.adicionarArestaValoradaNaoDirigida(3, 5, 1);
-
-    /*
-    g2.setOrdem(3);
-    g2.adicionarArestaValoradaNaoDirigida(0, 1, 1);
-    g2.adicionarArestaValoradaNaoDirigida(1, 2, 1);
-    g2.adicionarArestaValoradaNaoDirigida(2, 0, 1);
-
-    if (g2.isDesconexo()) {
-        cout << "Desconexo";
+    cout << "Qual questao? [1 ou 2]" << endl;
+    cin >> i;
+    if (i == 1) {
+        cout << "[1] Onde esta o arquivo? Ex.: C:/temp/grafo.txt" << endl;
+        cin >> arquivo;
+        importarArquivoLista(arquivo, grafo, i);
+        list<unsigned int> ciclo;
+        unsigned int custo = grafo.dijkstra(0, grafo.getOrdem()-1, ciclo);
+        if (!ciclo.empty()) {
+            cout << "Rota: ";
+            while(!ciclo.empty()) {
+                cout << ciclo.back() << " - ";
+                ciclo.pop_back();
+            }
+            cout << "Custo: " << custo;
+        }
+    } else if (i == 2) {
+        cout << "[2] Onde esta o arquivo? Ex.: C:/temp/grafo.txt" << endl;
+        cin >> arquivo;
+        importarArquivoLista(arquivo, grafo, i);
+        grafo.carteiroChines();
     } else {
-        cout << "Conexo";
-    }*/
-
-    /*g2.setOrdem(7);
-    g2.adicionarArestaValoradaNaoDirigida(0, 3, 1);
-    g2.adicionarArestaValoradaNaoDirigida(0, 4, 1);
-    g2.adicionarArestaValoradaNaoDirigida(1, 4, 1);
-    g2.adicionarArestaValoradaNaoDirigida(1, 5, 1);
-    g2.adicionarArestaValoradaNaoDirigida(2, 5, 1);
-    g2.adicionarArestaValoradaNaoDirigida(2, 6, 1);
-    g2.adicionarArestaValoradaNaoDirigida(3, 4, 1);
-    g2.adicionarArestaValoradaNaoDirigida(4, 5, 1);
-    g2.adicionarArestaValoradaNaoDirigida(5, 6, 1);*/
-
-    g2.carteiroChines();
+        cout << "Opcao invalida.";
+    }
 
     return 0;
 }
